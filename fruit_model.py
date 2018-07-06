@@ -19,14 +19,14 @@ import numpy as np
 
 class FruitGanModel:
 
-    def __init__(self, image_size=32):
+    def __init__(self, image_size=48):
 
         # hyper parameter
         self.latent_dim = 100
 
         self.img_rows = image_size
         self.img_cols = image_size
-        self.channels = 1
+        self.channels = 3
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
 
         dataset = "fruit"
@@ -34,7 +34,10 @@ class FruitGanModel:
         if(dataset == "mnist"):
             # Load the dataset
             (self.x_train, self.y_train), (_, _) = mnist.load_data()
+            self.x_train = np.expand_dims(self.x_train, axis=3)
+
             self.num_classes = 10
+            self.channels = 1
             self.img_rows = 28
             self.img_cols = 28
 
@@ -134,7 +137,6 @@ class FruitGanModel:
 
         # Configure input
         X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-        X_train = np.expand_dims(X_train, axis=3)
         y_train = y_train.reshape(-1, 1)
 
         print("X_train.shape", X_train.shape)
@@ -199,6 +201,12 @@ class FruitGanModel:
         # Rescale images 0 - 1
         gen_imgs = 0.5 * gen_imgs + 0.5
 
+        upper_limit = np.vectorize(lambda x: 1 if x > 1 else x)
+        under_limit = np.vectorize(lambda x: 0 if x < 0 else x)
+
+        gen_imgs = upper_limit(gen_imgs)
+        gen_imgs = under_limit(gen_imgs)
+
         # plt.imshow(gen_imgs[1, :, :, 0], cmap='gray')
         # plt.show()
 
@@ -210,8 +218,8 @@ class FruitGanModel:
                     axs_i_j = axs[j]
                 else:
                     axs_i_j = axs[i, j]
-                axs_i_j.imshow(gen_imgs[cnt, :, :, 0], cmap='gray')
-                axs_i_j.set_title("Digit: %d" % sampled_labels[cnt])
+                axs_i_j.imshow(gen_imgs[cnt])
+                axs_i_j.set_title("%s" % self.categories[sampled_labels[cnt]])
                 axs_i_j.axis('off')
                 cnt += 1
         fig.savefig("images/%d.png" % epoch)
@@ -269,7 +277,6 @@ class FruitGanModel:
 
         print("prepare: self.num_classes:", self.num_classes)
 
-        # If subtract pixel mean is enabled
         # if subtract_pixel_mean:
         #    self.x_train_mean = np.mean(self.x_train, axis=0)
         #    self.x_train -= self.x_train_mean
@@ -280,12 +287,12 @@ class FruitGanModel:
 
     def preprocess_image(self, filepath):
         # 画像を48 x 48(pixel設定可) x channel のnp_arrayに変換
-        # そして /255.で 正規化する
 
-        # grey scaleにする
-        image = Image.open(filepath).convert("L")
+        image = Image.open(filepath)
         image = np.array(image.resize((self.img_rows, self.img_cols)))
-        #image = image.reshape(self.img_rows, self.img_cols, self.channels)
+        image = image.reshape(self.img_rows, self.img_cols, self.channels)
+
+        print("preprocess, image.shape:", image.shape)
 
         return image
 
@@ -294,5 +301,5 @@ class FruitGanModel:
 
 
 if __name__ == '__main__':
-    cgan = FruitGanModel(image_size=32)
+    cgan = FruitGanModel(image_size=48)
     cgan.train(epochs=20000, batch_size=32, sample_interval=200)
