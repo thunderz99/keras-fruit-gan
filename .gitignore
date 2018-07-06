@@ -1,0 +1,9 @@
+.vscode
+.env
+__pycache__
+images
+webapp/__pycache__
+webapp/saved_models
+webapp/react/node_modules
+webapp/react/build
+webapp/data/raw
