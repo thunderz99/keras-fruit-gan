@@ -7,4 +7,4 @@ webapp/saved_models
 webapp/react/node_modules
 webapp/react/build
 webapp/data/raw
-saved_models
+saved_models/*.h5
