@@ -290,8 +290,6 @@ class FruitGanModel:
 
         (self.x_train, self.y_train,
          self.categories) = self._load_image_to_array("data/train")
-        (self.x_test, self.y_test,
-         _) = self._load_image_to_array("data/test")
 
         self.num_classes = self.y_train.shape[1]
 
