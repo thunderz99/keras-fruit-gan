@@ -5,7 +5,7 @@ from keras.datasets import mnist
 from keras.models import Sequential, Model
 from keras.models import load_model
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply
-from keras.layers import BatchNormalization, Activation, Embedding
+from keras.layers import BatchNormalization, Activation, Embedding, concatenate
 from keras.layers import ZeroPadding2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
@@ -28,6 +28,8 @@ class FruitGanModel:
         self.img_cols = image_size
         self.channels = 3
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
+
+        self.model_dir = "saved_models"
 
         dataset = "fruit"
 
@@ -79,7 +81,7 @@ class FruitGanModel:
 
         model = Sequential()
 
-        model.add(Dense(512, input_dim=np.prod(self.img_shape)))
+        model.add(Dense(512, input_dim=(np.prod(self.img_shape) * 2)))
         model.add(LeakyReLU(alpha=0.2))
         model.add(Dense(512))
         model.add(LeakyReLU(alpha=0.2))
@@ -97,7 +99,12 @@ class FruitGanModel:
                                               np.prod(self.img_shape))(label))
         flat_img = Flatten()(img)
 
-        model_input = multiply([flat_img, label_embedding])
+        print("D flat_img.shape:", flat_img.shape)
+        print("D label_embedding.shape:", label_embedding.shape)
+
+        # model_input = multiply([flat_img, label_embedding])
+        model_input = concatenate([flat_img, label_embedding])
+        print("D model_input.shape:", model_input.shape)
 
         validity = model(model_input)
 
@@ -107,7 +114,7 @@ class FruitGanModel:
 
         model = Sequential()
 
-        model.add(Dense(256, input_dim=self.latent_dim))
+        model.add(Dense(256, input_dim=self.latent_dim * 2))
         model.add(LeakyReLU(alpha=0.2))
         model.add(BatchNormalization(momentum=0.8))
         model.add(Dense(512))
@@ -126,7 +133,14 @@ class FruitGanModel:
         label_embedding = Flatten()(Embedding(self.num_classes,
                                               self.latent_dim)(label))
 
-        model_input = multiply([noise, label_embedding])
+        print("noise.shape:", noise.shape)
+        print("label_embedding.shape:", label_embedding.shape)
+
+        # model_input = multiply([noise, label_embedding])
+        model_input = concatenate([noise, label_embedding])
+
+        print("model_input.shape:", model_input.shape)
+
         img = model(model_input)
 
         return Model([noise, label], img)
@@ -190,6 +204,10 @@ class FruitGanModel:
             # If at save interval => save generated image samples
             if epoch % sample_interval == 0:
                 self.sample_images(epoch)
+                self.discriminator.save(
+                    self.model_dir + "/" + "discriminator.h5")
+                self.generator.save(self.model_dir + "/" + "generator.h5")
+                self.combined.save(self.model_dir + "/" + "combined.h5")
 
     def sample_images(self, epoch):
         r, c = 1, self.num_classes
@@ -219,7 +237,8 @@ class FruitGanModel:
                 else:
                     axs_i_j = axs[i, j]
                 axs_i_j.imshow(gen_imgs[cnt])
-                axs_i_j.set_title("%s" % self.categories[sampled_labels[cnt]])
+                axs_i_j.set_title(
+                    "%s" % self.categories[sampled_labels[cnt][0]])
                 axs_i_j.axis('off')
                 cnt += 1
         fig.savefig("images/%d.png" % epoch)
@@ -255,7 +274,8 @@ class FruitGanModel:
 
         # ラベルの配列をone hotラベル配列に変更
         # 0 -> [1,0,0,0], 1 -> [0,1,0,0] という感じ。
-        y = to_categorical(y)
+        if(len(y) > 0):
+            y = to_categorical(y)
 
         return (x, y, categories)
 
