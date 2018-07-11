@@ -1,3 +1,7 @@
+"""
+Conditional Deep Conv GAN to generate fruits images (Under construction)
+"""
+
 import sys
 import os
 
@@ -6,7 +10,7 @@ from keras.models import Sequential, Model
 from keras.models import load_model
 from keras.layers import Input, Dense, Reshape, Flatten, Dropout, multiply
 from keras.layers import BatchNormalization, Activation, Embedding, concatenate
-from keras.layers import ZeroPadding2D
+from keras.layers import ZeroPadding2D, MaxPooling2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.optimizers import Adam
@@ -17,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class FruitGanModel:
+class FruitCondDCGanModel:
 
     def __init__(self, image_size=48):
 
@@ -79,54 +83,66 @@ class FruitGanModel:
 
     def build_discriminator(self):
 
+        # image part
         model = Sequential()
+        model.add(
+            Conv2D(64, (5, 5),
+                   padding='same',
+                   input_shape=self.img_shape)
+        )
+        model.add(Activation('tanh'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Conv2D(128, (5, 5)))
+        model.add(Activation('tanh'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Flatten())
+        model.add(Dense(self.latent_dim))
 
-        model.add(Dense(512, input_dim=(np.prod(self.img_shape) * 2)))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dense(512))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.4))
-        model.add(Dense(512))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(Dropout(0.4))
-        model.add(Dense(1, activation='sigmoid'))
         model.summary()
 
         img = Input(shape=self.img_shape)
+        img_vector = model(img)
+        print("D img_vector.shape:", img_vector.shape)
+
+        # label part
         label = Input(shape=(1,), dtype='int32')
+        label_vector = Flatten()(
+            Embedding(self.num_classes, self.latent_dim)(label))
+        print("D label_vector.shape:", label_vector.shape)
 
-        label_embedding = Flatten()(Embedding(self.num_classes,
-                                              np.prod(self.img_shape))(label))
-        flat_img = Flatten()(img)
+        merged_vector = concatenate([img_vector, label_vector])
+        print("D merged_vector.shape:", merged_vector.shape)
 
-        print("D flat_img.shape:", flat_img.shape)
-        print("D label_embedding.shape:", label_embedding.shape)
+        output = Dense(self.latent_dim)(merged_vector)
 
-        # model_input = multiply([flat_img, label_embedding])
-        model_input = concatenate([flat_img, label_embedding])
-        print("D model_input.shape:", model_input.shape)
+        output = Dense(1,)(output)
 
-        validity = model(model_input)
+        output = Activation('sigmoid')(output)
 
-        return Model([img, label], validity)
+        d_model = Model([img, label], output)
+
+        d_model.summary()
+
+        return d_model
 
     def build_generator(self):
 
+        conv_img_size = int(self.img_rows / 4)
+
         model = Sequential()
-
-        model.add(Dense(256, input_dim=self.latent_dim * 2))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(512))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(1024))
-        model.add(LeakyReLU(alpha=0.2))
-        model.add(BatchNormalization(momentum=0.8))
-        model.add(Dense(np.prod(self.img_shape), activation='tanh'))
-        model.add(Reshape(self.img_shape))
-
-        model.summary()
+        model.add(Dense(input_dim=self.latent_dim * 2, units=1024))
+        model.add(Activation('tanh'))
+        model.add(Dense(128*conv_img_size*conv_img_size))
+        model.add(BatchNormalization())
+        model.add(Activation('tanh'))
+        model.add(Reshape((conv_img_size, conv_img_size, 128),
+                          input_shape=(128*conv_img_size*conv_img_size,)))
+        model.add(UpSampling2D(size=(2, 2)))
+        model.add(Conv2D(64, (5, 5), padding='same'))
+        model.add(Activation('tanh'))
+        model.add(UpSampling2D(size=(2, 2)))
+        model.add(Conv2D(self.channels, (5, 5), padding='same'))
+        model.add(Activation('tanh'))
 
         noise = Input(shape=(self.latent_dim,))
         label = Input(shape=(1,), dtype='int32')
@@ -136,14 +152,16 @@ class FruitGanModel:
         print("noise.shape:", noise.shape)
         print("label_embedding.shape:", label_embedding.shape)
 
-        # model_input = multiply([noise, label_embedding])
         model_input = concatenate([noise, label_embedding])
 
         print("model_input.shape:", model_input.shape)
 
         img = model(model_input)
 
-        return Model([noise, label], img)
+        g_model = Model([noise, label], img)
+        g_model.summary()
+
+        return g_model
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
@@ -319,5 +337,5 @@ class FruitGanModel:
 
 
 if __name__ == '__main__':
-    cgan = FruitGanModel(image_size=48)
-    cgan.train(epochs=20000, batch_size=32, sample_interval=200)
+    cgan = FruitCondDCGanModel(image_size=48)
+    cgan.train(epochs=1000, batch_size=32, sample_interval=20)

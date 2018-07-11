@@ -1,3 +1,7 @@
+"""
+(Not conditional) Deep Conv GAN to generate fruits images.
+"""
+
 import sys
 import os
 
@@ -17,11 +21,15 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-class FruitGanModel:
+class FruitDCGanModel:
 
     def __init__(self, image_size=48):
 
         # hyper parameter
+        # noise dim: 10, 50 ,100
+        # the smaller the faster convengience(with less variation)
+
+        self.z_dim = 50
         self.latent_dim = 100
 
         self.img_rows = image_size
@@ -58,22 +66,20 @@ class FruitGanModel:
         # Build the generator
         self.generator = self.build_generator()
 
-        # The generator takes noise and the target label as input
-        # and generates the corresponding digit of that label
-        noise = Input(shape=(100,))
-        label = Input(shape=(1,))
-        img = self.generator([noise, label])
+        noise = Input(shape=(self.z_dim,))
+        # label = Input(shape=(1,))
+        img = self.generator(noise)
 
         # For the combined model we will only train the generator
         self.discriminator.trainable = False
 
         # The discriminator takes generated image as input and determines validity
         # and the label of that image
-        valid = self.discriminator([img, label])
+        valid = self.discriminator(img)
 
         # The combined model  (stacked generator and discriminator)
         # Trains generator to fool discriminator
-        self.combined = Model([noise, label], valid)
+        self.combined = Model(noise, valid)
         self.combined.compile(loss=['binary_crossentropy'],
                               optimizer=optimizer)
 
@@ -93,71 +99,37 @@ class FruitGanModel:
         model.add(MaxPooling2D(pool_size=(2, 2)))
         model.add(Flatten())
         model.add(Dense(self.latent_dim))
+        model.add(Dense(1,))
+        model.add(Activation('sigmoid'))
 
         model.summary()
 
-        img = Input(shape=self.img_shape)
-        img_vector = model(img)
-        print("D img_vector.shape:", img_vector.shape)
-
-        # label part
-        label = Input(shape=(1,), dtype='int32')
-        label_vector = Flatten()(
-            Embedding(self.num_classes, self.latent_dim)(label))
-        print("D label_vector.shape:", label_vector.shape)
-
-        merged_vector = concatenate([img_vector, label_vector])
-        print("D merged_vector.shape:", merged_vector.shape)
-
-        output = Dense(self.latent_dim)(merged_vector)
-
-        output = Dense(1,)(output)
-
-        output = Activation('sigmoid')(output)
-
-        d_model = Model([img, label], output)
-
-        d_model.summary()
-
-        return d_model
+        return model
 
     def build_generator(self):
 
         conv_img_size = int(self.img_rows / 4)
 
         model = Sequential()
-        model.add(Dense(input_dim=self.latent_dim * 2, units=1024))
+        model.add(Dense(input_dim=self.z_dim, units=1024))
         model.add(Activation('tanh'))
         model.add(Dense(128*conv_img_size*conv_img_size))
         model.add(BatchNormalization())
         model.add(Activation('tanh'))
         model.add(Reshape((conv_img_size, conv_img_size, 128),
                           input_shape=(128*conv_img_size*conv_img_size,)))
+
         model.add(UpSampling2D(size=(2, 2)))
         model.add(Conv2D(64, (5, 5), padding='same'))
         model.add(Activation('tanh'))
+
         model.add(UpSampling2D(size=(2, 2)))
         model.add(Conv2D(self.channels, (5, 5), padding='same'))
         model.add(Activation('tanh'))
 
-        noise = Input(shape=(self.latent_dim,))
-        label = Input(shape=(1,), dtype='int32')
-        label_embedding = Flatten()(Embedding(self.num_classes,
-                                              self.latent_dim)(label))
+        model.summary()
 
-        print("noise.shape:", noise.shape)
-        print("label_embedding.shape:", label_embedding.shape)
-
-        model_input = concatenate([noise, label_embedding])
-
-        print("model_input.shape:", model_input.shape)
-
-        img = model(model_input)
-
-        g_model = Model([noise, label], img)
-        g_model.summary()
-
-        return g_model
+        return model
 
     def train(self, epochs, batch_size=128, sample_interval=50):
 
@@ -185,17 +157,17 @@ class FruitGanModel:
             imgs, labels = X_train[idx], y_train[idx]
 
             # Sample noise as generator input
-            noise = np.random.normal(0, 1, (batch_size, 100))
+            noise = np.random.normal(0, 1, (batch_size, self.z_dim))
 
             # Generate a half batch of new images
-            gen_imgs = self.generator.predict([noise, labels])
+            gen_imgs = self.generator.predict(noise)
 
             # Train the discriminator
             d_loss_real = self.discriminator.train_on_batch(
-                [imgs, labels], valid)
+                imgs, valid)
 
             d_loss_fake = self.discriminator.train_on_batch(
-                [gen_imgs, labels], fake)
+                gen_imgs, fake)
 
             d_loss = 0.5 * np.add(d_loss_real, d_loss_fake)
 
@@ -204,12 +176,12 @@ class FruitGanModel:
             # ---------------------
 
             # Condition on labels
-            sampled_labels = np.random.randint(
-                0, self.num_classes, batch_size).reshape(-1, 1)
+            # sampled_labels = np.random.randint(
+            #    0, self.num_classes, batch_size).reshape(-1, 1)
 
             # Train the generator
             g_loss = self.combined.train_on_batch(
-                [noise, sampled_labels], valid)
+                noise, valid)
 
             # Plot the progress
             print("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" %
@@ -225,10 +197,10 @@ class FruitGanModel:
 
     def sample_images(self, epoch):
         r, c = 1, self.num_classes
-        noise = np.random.normal(0, 1, (r * c, 100))
-        sampled_labels = np.arange(0, self.num_classes).reshape(-1, 1)
+        noise = np.random.normal(0, 1, (r * c, self.z_dim))
+        # sampled_labels = np.arange(0, self.num_classes).reshape(-1, 1)
 
-        gen_imgs = self.generator.predict([noise, sampled_labels])
+        gen_imgs = self.generator.predict(noise)
 
         # Rescale images 0 - 1
         gen_imgs = 0.5 * gen_imgs + 0.5
@@ -239,9 +211,6 @@ class FruitGanModel:
         gen_imgs = upper_limit(gen_imgs)
         gen_imgs = under_limit(gen_imgs)
 
-        # plt.imshow(gen_imgs[1, :, :, 0], cmap='gray')
-        # plt.show()
-
         fig, axs = plt.subplots(r, c)
         cnt = 0
         for i in range(r):
@@ -251,8 +220,8 @@ class FruitGanModel:
                 else:
                     axs_i_j = axs[i, j]
                 axs_i_j.imshow(gen_imgs[cnt])
-                axs_i_j.set_title(
-                    "%s" % self.categories[sampled_labels[cnt][0]])
+                # axs_i_j.set_title(
+                #    "%s" % self.categories[sampled_labels[cnt][0]])
                 axs_i_j.axis('off')
                 cnt += 1
         fig.savefig("images/%d.png" % epoch)
@@ -333,5 +302,5 @@ class FruitGanModel:
 
 
 if __name__ == '__main__':
-    cgan = FruitGanModel(image_size=48)
+    cgan = FruitDCGanModel(image_size=48)
     cgan.train(epochs=1000, batch_size=32, sample_interval=20)
