@@ -4,25 +4,25 @@
 
 ### 生成結果(64x64 png)
 
-![apple](docs/images/apple_500.png)  ![banana](docs/images/banana_500.png) 
+![apple](docs/doc_images/apple_500.png)  ![banana](docs/doc_images/banana_500.png) 
 
 
 
 ### 途中結果
 
-![apple](docs/images/apple_000.png) ite0
+![apple](docs/doc_images/apple_000.png) ite0
 
-![apple](docs/images/apple_020.png) ite20
+![apple](docs/doc_images/apple_020.png) ite20
 
-![apple](docs/images/apple_100.png) ite100
+![apple](docs/doc_images/apple_100.png) ite100
 
-![apple](docs/images/apple_200.png) ite200
+![apple](docs/doc_images/apple_200.png) ite200
 
-![apple](docs/images/apple_300.png) ite300
+![apple](docs/doc_images/apple_300.png) ite300
 
-![apple](docs/images/apple_400.png) ite400
+![apple](docs/doc_images/apple_400.png) ite400
 
-![apple](docs/images/apple_500.png) ite500
+![apple](docs/doc_images/apple_500.png) ite500
 
 
 
@@ -35,11 +35,11 @@
 
 ## 実現の仕方
 
-![gan](docs/images/gan.png)
+![gan](docs/doc_images/gan.png)
 
 こちら数字画像生成のgithubソースを参考し、改造した。 [2]
 
-![mnist_digit](docs/images/digits.png)
+![mnist_digit](docs/doc_images/digits.png)
 
 
 ## Usage
