@@ -1,7 +1,7 @@
 .vscode
 .env
 __pycache__
-images
+images/*.png
 webapp/__pycache__
 webapp/saved_models
 webapp/react/node_modules
