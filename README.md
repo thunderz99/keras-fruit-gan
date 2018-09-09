@@ -41,6 +41,12 @@
 
 ![mnist_digit](docs/doc_images/digits.png)
 
+## わかったこと
+
+* Convolution Networkの方は、Full Connected Networkより、生成した画像がスムーズ。 Full Connected Networkの場合は、どうしても雑音が入る。
+
+* 通常のGANはハイパーパラメータに敏感。収束しないことがある。より安定性のあるDRAGANなどは今後試すべき。
+
 
 ## Usage
 
